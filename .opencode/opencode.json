@@ -1,0 +1,116 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "brainstorm-host",
+  "skills": {
+    "paths": [
+      ".opencode/skills"
+    ]
+  },
+  "plugin": [
+    "./plugin/brainstorm-orchestrator.ts"
+  ],
+  "agent": {
+    "brainstorm-host": {
+      "mode": "primary",
+      "description": "主持多 agent 同题头脑风暴，负责定题、控场、收敛结论。",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "edit": {
+          ".opencode/brainstorm/registry.json": "allow",
+          ".opencode/brainstorm/*.md": "allow",
+          "": "ask"
+        },
+        "bash": {
+          "git status ": "allow",
+          "git diff ": "allow",
+          "": "ask"
+        },
+        "edit": "ask",
+        "external_directory": {
+          "*": "ask"
+        }
+      }
+    },
+    "brainstorm-diverger": {
+      "mode": "subagent",
+      "description": "多 agent 头脑风暴中的发散角色，负责同题提出不同方案。",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "bash": {
+          "": "ask"
+        },
+        "edit": "deny",
+        "external_directory": {
+          "*": "ask"
+        }
+      }
+    },
+    "brainstorm-critic": {
+      "mode": "subagent",
+      "description": "多 agent 头脑风暴中的挑刺角色，负责批判性审查方案漏洞与边界条件。",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "bash": {
+          "": "ask"
+        },
+        "edit": "deny",
+        "external_directory": {
+          "*": "ask"
+        }
+      }
+    },
+    "brainstorm-engineer": {
+      "mode": "subagent",
+      "description": "多 agent 头脑风暴中的工程评估角色，负责可落地性、成本和验证难度判断。",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "bash": {
+          "": "ask"
+        },
+        "edit": "deny",
+        "external_directory": {
+          "*": "ask"
+        }
+      }
+    },
+    "brainstorm-researcher": {
+      "mode": "subagent",
+      "description": "多 agent 头脑风暴中的研究角色，负责补充事实、资料和最佳实践。",
+      "permission": {
+        "read": "allow",
+        "glob": "allow",
+        "grep": "allow",
+        "list": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "bash": {
+          "": "ask"
+        },
+        "edit": "deny",
+        "external_directory": {
+          "*": "ask"
+        }
+      }
+    }
+  },
+  "command": {
+    "brainstorm": {
+      "description": "启动多 agent 同题头脑风暴流程。",
+      "template": "请围绕以下问题开展多 agent 头脑风暴：$ARGUMENTS\n\n流程要求：\n1. 先定题，明确目标、约束、已知事实和评估标准。\n2. 并行拉起多个视角不同的子代理发散讨论。\n3. 让挑刺代理专门找漏洞和边界条件。\n4. 让工程代理评估可落地性与成本。\n5. 最后由主持人收敛成主方案、备选方案和风险清单。\n\n请输出结构化结果，优先给结论。",
+      "agent": "brainstorm-host",
+      "model": "caozke-copy/gpt-5.4-mini"
+    }
+  }
+}
