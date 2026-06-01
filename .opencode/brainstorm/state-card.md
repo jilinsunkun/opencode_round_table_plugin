@@ -1,4 +1,6 @@
-# 状态卡模板
+# 状态卡
+
+> 由插件生成，禁止手工维护；格式受 `.opencode/brainstorm/state-card-rules.md` 约束。
 
 > 当前议题 ID：
 

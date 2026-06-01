@@ -181,15 +181,15 @@
 
 ## 验收清单
 
-- [ ] `state-card-rules.md` 是唯一规则正文来源
-- [ ] `agents/brainstorm-host.md` 只保留角色壳和短引用
-- [ ] `commands/brainstorm.md` 只保留入口说明和短引用
-- [ ] `plugin/brainstorm-orchestrator.ts` 只做执行、校验、写入
-- [ ] `opencode.json` 只保留机器配置与装配
-- [ ] `state-card.md` 只作为插件生成产物
-- [ ] `registry.json` 只保存运行时状态
-- [ ] 规则改动后无需同步改多份正文
-- [ ] 字段名、字段顺序、字段语义在不同层保持一致
+- [x] `state-card-rules.md` 是唯一规则正文来源
+- [x] `agents/brainstorm-host.md` 只保留角色壳和短引用
+- [x] `commands/brainstorm.md` 只保留入口说明和短引用
+- [x] `plugin/brainstorm-orchestrator.ts` 只做执行、校验、写入
+- [x] `opencode.json` 只保留机器配置与装配
+- [x] `state-card.md` 只作为插件生成产物
+- [x] `registry.json` 只保存运行时状态
+- [x] 规则改动后无需同步改多份正文
+- [x] 字段名、字段顺序、字段语义在不同层保持一致
 
 ---
 

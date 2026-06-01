@@ -61,31 +61,26 @@ type Registry = {
 
 const roleOrder = ["host", "diverger", "critic", "engineer", "researcher"] as const
 
-const roleMeta: Record<(typeof roleOrder)[number], { roleName: string; title: string; seed: string }> = {
+const roleMeta: Record<(typeof roleOrder)[number], { roleName: string; title: string }> = {
   host: {
     roleName: "brainstorm-host",
     title: "主持人",
-    seed: "你是主持 Agent，负责定题、控场、汇总与裁决。",
   },
   diverger: {
     roleName: "brainstorm-diverger",
     title: "发散者",
-    seed: "你是发散型 Agent，负责围绕同一问题给出不同方案和视角。",
   },
   critic: {
     roleName: "brainstorm-critic",
     title: "挑刺者",
-    seed: "你是挑刺型 Agent，负责批判性审查漏洞、边界条件与失败场景。",
   },
   engineer: {
     roleName: "brainstorm-engineer",
     title: "工程评估者",
-    seed: "你是工程可行性 Agent，负责评估落地性、成本和验证路径。",
   },
   researcher: {
     roleName: "brainstorm-researcher",
     title: "研究者",
-    seed: "你是研究型 Agent，负责补充事实、资料和最佳实践。",
   },
 }
 
@@ -255,28 +250,33 @@ export default (async ({ client }) => {
     if (!prompt.trim()) throw new Error("brainstorm command requires a concrete topic/question")
   }
 
-  const stateCardMarkdown = (topic: TopicRecord) => `# 状态卡
+  const renderList = (items: string[]) => (items.length ? items.map((item) => `- ${item}`).join("\n") : "-")
 
-> 当前议题 ID：${topic.topicId}
-
-## 当前问题
-${topic.stateCard.currentQuestion || ""}
-
-## 当前主方案
-${topic.stateCard.currentMainProposal || ""}
-
-## 已否决方案
-${topic.stateCard.rejectedProposals.length ? topic.stateCard.rejectedProposals.map((item) => `- ${item}`).join("\n") : "-"}
-
-## 关键争议
-${topic.stateCard.keyConflicts.length ? topic.stateCard.keyConflicts.map((item) => `- ${item}`).join("\n") : "-"}
-
-## 仍待验证点
-${topic.stateCard.openQuestions.length ? topic.stateCard.openQuestions.map((item) => `- ${item}`).join("\n") : "-"}
-
-## 下一轮需要回答的问题
-${topic.stateCard.nextRoundQuestions.length ? topic.stateCard.nextRoundQuestions.map((item) => `- ${item}`).join("\n") : "-"}
-`
+  const stateCardMarkdown = (topic: TopicRecord) => [
+    "# 状态卡",
+    "",
+    "> 由插件生成，禁止手工维护；格式受 `.opencode/brainstorm/state-card-rules.md` 约束。",
+    "",
+    `> 当前议题 ID：${topic.topicId}`,
+    "",
+    "## 当前问题",
+    topic.stateCard.currentQuestion || "",
+    "",
+    "## 当前主方案",
+    topic.stateCard.currentMainProposal || "",
+    "",
+    "## 已否决方案",
+    renderList(topic.stateCard.rejectedProposals),
+    "",
+    "## 关键争议",
+    renderList(topic.stateCard.keyConflicts),
+    "",
+    "## 仍待验证点",
+    renderList(topic.stateCard.openQuestions),
+    "",
+    "## 下一轮需要回答的问题",
+    renderList(topic.stateCard.nextRoundQuestions),
+  ].join("\n")
 
   const topicHeader = (topic: TopicRecord) => [
     `当前议题 ID：${topic.topicId}`,
@@ -320,7 +320,8 @@ ${topic.stateCard.nextRoundQuestions.length ? topic.stateCard.nextRoundQuestions
           {
             type: "text",
             text: [
-              meta.seed,
+              `角色：${meta.title}（${meta.roleName}）`,
+              "规则：.opencode/brainstorm/state-card-rules.md",
               "",
               topicHeader(topic),
               "",
@@ -382,74 +383,6 @@ ${topic.stateCard.nextRoundQuestions.length ? topic.stateCard.nextRoundQuestions
   const isBrainstormCommand = (output: any) => String(output?.command ?? output?.name ?? "") === "brainstorm"
 
   return {
-    config: (cfg) => {
-      cfg.default_agent = cfg.default_agent || "brainstorm-host"
-
-      cfg.skills ??= {}
-      cfg.skills.paths = Array.from(new Set([...(cfg.skills.paths ?? []), ".opencode/skills"]))
-
-      cfg.agent ??= {}
-      cfg.agent["brainstorm-host"] = {
-        ...(cfg.agent["brainstorm-host"] ?? {}),
-        mode: "primary",
-        description: "主持多 agent 同题头脑风暴，负责定题、控场、收敛结论。",
-        permission: {
-          ...(cfg.agent["brainstorm-host"]?.permission ?? {}),
-          task: {
-            "": "deny",
-            "brainstorm-diverger": "allow",
-            "brainstorm-critic": "allow",
-            "brainstorm-engineer": "allow",
-            "brainstorm-researcher": "allow",
-          },
-        },
-      }
-      cfg.agent["brainstorm-diverger"] = {
-        ...(cfg.agent["brainstorm-diverger"] ?? {}),
-        mode: "subagent",
-        description: "多 agent 头脑风暴中的发散角色，负责同题提出不同方案。",
-        permission: {
-          ...(cfg.agent["brainstorm-diverger"]?.permission ?? {}),
-          task: "deny",
-        },
-      }
-      cfg.agent["brainstorm-critic"] = {
-        ...(cfg.agent["brainstorm-critic"] ?? {}),
-        mode: "subagent",
-        description: "多 agent 头脑风暴中的挑刺角色，负责批判性审查方案漏洞与边界条件。",
-        permission: {
-          ...(cfg.agent["brainstorm-critic"]?.permission ?? {}),
-          task: "deny",
-        },
-      }
-      cfg.agent["brainstorm-engineer"] = {
-        ...(cfg.agent["brainstorm-engineer"] ?? {}),
-        mode: "subagent",
-        description: "多 agent 头脑风暴中的工程评估角色，负责可落地性、成本和验证难度判断。",
-        permission: {
-          ...(cfg.agent["brainstorm-engineer"]?.permission ?? {}),
-          task: "deny",
-        },
-      }
-      cfg.agent["brainstorm-researcher"] = {
-        ...(cfg.agent["brainstorm-researcher"] ?? {}),
-        mode: "subagent",
-        description: "多 agent 头脑风暴中的研究角色，负责补充事实、资料和最佳实践。",
-        permission: {
-          ...(cfg.agent["brainstorm-researcher"]?.permission ?? {}),
-          task: "deny",
-        },
-      }
-
-      cfg.command ??= {}
-      cfg.command.brainstorm = {
-        ...(cfg.command.brainstorm ?? {}),
-        description: "启动多 agent 同题头脑风暴流程。",
-        agent: "brainstorm-host",
-        subtask: false,
-      }
-    },
-
     "session.created": async (event) => {
       const registry = readRegistry()
       const topicId = registry.activeTopicId
@@ -525,15 +458,10 @@ ${topic.stateCard.nextRoundQuestions.length ? topic.stateCard.nextRoundQuestions
       output.args.prompt = [
         prompt,
         "",
-        "执行要求：",
-        "1. 主持 agent 先定题，再发散。",
-        "2. 并行让发散、挑刺、工程、研究角色围绕同一问题讨论。",
-        "3. 每轮开始前生成状态卡，发给所有固定角色。",
-        "4. 角色固定、子代理固定、会话固定；上下文满了先压缩状态卡，再继续同一圆桌。",
-        "5. 最后由主持 agent 收敛成主方案、备选方案和风险清单。",
-        `6. 当前议题 ID：${topic.topicId}`,
-        `7. 当前轮次：${topic.round}`,
-        "8. 固定角色会话：",
+        "规则：.opencode/brainstorm/state-card-rules.md",
+        `当前议题 ID：${topic.topicId}`,
+        `当前轮次：${topic.round}`,
+        "固定角色会话：",
         ...sessionLines,
         "",
         stateCardMarkdown(topic),

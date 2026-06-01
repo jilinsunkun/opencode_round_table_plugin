@@ -28,7 +28,13 @@
           "git diff ": "allow",
           "": "ask"
         },
-        "edit": "ask",
+        "task": {
+          "": "deny",
+          "brainstorm-diverger": "allow",
+          "brainstorm-critic": "allow",
+          "brainstorm-engineer": "allow",
+          "brainstorm-researcher": "allow"
+        },
         "external_directory": {
           "*": "ask"
         }
@@ -45,6 +51,7 @@
         "bash": {
           "": "ask"
         },
+        "task": "deny",
         "edit": "deny",
         "external_directory": {
           "*": "ask"
@@ -62,6 +69,7 @@
         "bash": {
           "": "ask"
         },
+        "task": "deny",
         "edit": "deny",
         "external_directory": {
           "*": "ask"
@@ -79,6 +87,7 @@
         "bash": {
           "": "ask"
         },
+        "task": "deny",
         "edit": "deny",
         "external_directory": {
           "*": "ask"
@@ -98,19 +107,12 @@
         "bash": {
           "": "ask"
         },
+        "task": "deny",
         "edit": "deny",
         "external_directory": {
           "*": "ask"
         }
       }
-    }
-  },
-  "command": {
-    "brainstorm": {
-      "description": "启动多 agent 同题头脑风暴流程。",
-      "template": "请围绕以下问题开展多 agent 头脑风暴：$ARGUMENTS\n\n流程要求：\n1. 先定题，明确目标、约束、已知事实和评估标准。\n2. 并行拉起多个视角不同的子代理发散讨论。\n3. 让挑刺代理专门找漏洞和边界条件。\n4. 让工程代理评估可落地性与成本。\n5. 最后由主持人收敛成主方案、备选方案和风险清单。\n\n请输出结构化结果，优先给结论。",
-      "agent": "brainstorm-host",
-      "model": "caozke-copy/gpt-5.4-mini"
     }
   }
 }
