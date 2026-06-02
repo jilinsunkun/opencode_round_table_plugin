@@ -29,6 +29,7 @@ type TopicRecord = {
   createdAt: string
   updatedAt: string
   round: number
+  cardSuite?: string
   roles: {
     host: TopicRole
     diverger: TopicRole
@@ -131,6 +132,7 @@ const normalizeTopic = (value: unknown, topicIdFallback = ""): TopicRecord | nul
   const createdAt = typeof value.createdAt === "string" ? value.createdAt : new Date().toISOString()
   const updatedAt = typeof value.updatedAt === "string" ? value.updatedAt : createdAt
   const round = Number.isFinite(Number(value.round)) && Number(value.round) > 0 ? Number(value.round) : 1
+  const cardSuite = typeof value.cardSuite === "string" ? value.cardSuite : "general"
   const roles = isRecord(value.roles) ? value.roles : {}
   const stateCardRaw = isRecord(value.stateCard) ? value.stateCard : {}
   const history = Array.isArray(value.history)
@@ -160,6 +162,7 @@ const normalizeTopic = (value: unknown, topicIdFallback = ""): TopicRecord | nul
     createdAt,
     updatedAt,
     round,
+    cardSuite,
     roles: {
       host: normalizeRole(roles.host, roleMeta.host.roleName),
       diverger: normalizeRole(roles.diverger, roleMeta.diverger.roleName),
@@ -278,20 +281,52 @@ export default (async ({ client }) => {
     renderList(topic.stateCard.nextRoundQuestions),
   ].join("\n")
 
+  const loadCardSuite = (suiteName: string): any => {
+    try {
+      const cardPath = join(pluginDir, "..", "brainstorm", "cards", `${suiteName}.json`)
+      if (existsSync(cardPath)) {
+        return JSON.parse(readFileSync(cardPath, "utf8"))
+      }
+    } catch (e) {
+      // fallback
+    }
+    return null
+  }
+
+  const getRoleTitle = (topic: TopicRecord, roleKey: (typeof roleOrder)[number]): string => {
+    const suiteName = topic.cardSuite || "general"
+    const suite = loadCardSuite(suiteName)
+    if (suite && suite.roles && suite.roles[roleKey]) {
+      return suite.roles[roleKey].title
+    }
+    return roleMeta[roleKey].title
+  }
+
+  const getRoleSystemPrompt = (topic: TopicRecord, roleKey: (typeof roleOrder)[number]): string => {
+    const suiteName = topic.cardSuite || "general"
+    const suite = loadCardSuite(suiteName)
+    if (suite && suite.roles && suite.roles[roleKey]) {
+      return suite.roles[roleKey].systemPrompt
+    }
+    return ""
+  }
+
   const topicHeader = (topic: TopicRecord) => [
     `当前议题 ID：${topic.topicId}`,
     `当前轮次：${topic.round}`,
+    `当前插卡套件：${topic.cardSuite || "general"}`,
     `固定角色会话：`,
     ...roleOrder.map((roleKey) => {
       const role = topic.roles[roleKey]
-      return `- ${roleMeta[roleKey].title} (${role.roleName}) => ${role.sessionId ?? "未初始化"}`
+      const title = getRoleTitle(topic, roleKey)
+      return `- ${title} (${role.roleName}) => ${role.sessionId ?? "未初始化"}`
     }),
   ].join("\n")
 
   const seedRoleSession = async (topic: TopicRecord, roleKey: (typeof roleOrder)[number]) => {
     const role = topic.roles[roleKey]
     const meta = roleMeta[roleKey]
-    const title = `${meta.title} · ${topic.topicId}`
+    const title = `${getRoleTitle(topic, roleKey)} · ${topic.topicId}`
 
     if (role.sessionId) {
       try {
@@ -312,6 +347,8 @@ export default (async ({ client }) => {
       // title update is best-effort
     }
 
+    const customPrompt = getRoleSystemPrompt(topic, roleKey)
+
     await client.session.prompt({
       path: { id: role.sessionId },
       body: {
@@ -320,13 +357,14 @@ export default (async ({ client }) => {
           {
             type: "text",
             text: [
-              `角色：${meta.title}（${meta.roleName}）`,
+              `角色：${getRoleTitle(topic, roleKey)}（${meta.roleName}）`,
+              customPrompt ? `自定义角色指令：\n${customPrompt}` : "",
               "规则：.opencode/brainstorm/state-card-rules.md",
               "",
               topicHeader(topic),
               "",
               stateCardMarkdown(topic),
-            ].join("\n"),
+            ].filter(Boolean).join("\n"),
           },
         ],
       },
@@ -337,7 +375,7 @@ export default (async ({ client }) => {
     role.lastSeededAt = new Date().toISOString()
   }
 
-  const prepareTopic = (prompt: string, registry: Registry): TopicRecord => {
+  const prepareTopic = (prompt: string, cardSuiteName: string, registry: Registry): TopicRecord => {
     const active = registry.activeTopicId ? registry.topics[registry.activeTopicId] : null
 
     if (active && active.status === "active") {
@@ -350,6 +388,10 @@ export default (async ({ client }) => {
       })
       active.stateCard.currentQuestion = prompt
       active.stateCard.nextRoundQuestions = []
+      // Allow overriding card suite mid-discussion if specified and different
+      if (cardSuiteName && cardSuiteName !== active.cardSuite) {
+        active.cardSuite = cardSuiteName
+      }
       registry.activeTopicId = active.topicId
       return active
     }
@@ -362,6 +404,7 @@ export default (async ({ client }) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       round: 1,
+      cardSuite: cardSuiteName || "general",
       roles: {
         host: { roleName: roleMeta.host.roleName, sessionId: null, status: "pending", turnCount: 0, lastSeededAt: null },
         diverger: { roleName: roleMeta.diverger.roleName, sessionId: null, status: "pending", turnCount: 0, lastSeededAt: null },
@@ -419,11 +462,12 @@ export default (async ({ client }) => {
       if (!isBrainstormCommand(output)) return
 
       const prompt = String(output?.args?.prompt ?? "").trim()
+      const cardSuiteName = String(output?.args?.card ?? "general").trim()
       assertBrainstormReady(prompt)
 
       const registry = readRegistry()
       registry.bootstrappingTopicId = null
-      const topic = prepareTopic(prompt, registry)
+      const topic = prepareTopic(prompt, cardSuiteName, registry)
       registry.bootstrappingTopicId = topic.topicId
       writeRegistry(registry)
 
@@ -451,7 +495,7 @@ export default (async ({ client }) => {
 
       const sessionLines = roleOrder.map((roleKey) => {
         const role = topic.roles[roleKey]
-        return `- ${roleMeta[roleKey].title}: ${role.sessionId ?? "未初始化"}`
+        return `- ${getRoleTitle(topic, roleKey)}: ${role.sessionId ?? "未初始化"}`
       })
 
       output.args = output.args ?? {}
