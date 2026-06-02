@@ -1,0 +1,2 @@
+# opencode_round_table_plugin
+一个提供固定流程的圆桌会议插件
